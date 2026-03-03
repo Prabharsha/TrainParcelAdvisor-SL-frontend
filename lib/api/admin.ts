@@ -1,5 +1,10 @@
 import { apiClient, handleApiError } from './client';
-import type { User, Station, Train, DashboardStats, ApiResponse } from '../types';
+import type {
+  User, Station, Train, DashboardStats, ApiResponse,
+  AdminParcelsResponse, AdminParcelFilters,
+  AdminTicketsResponse, AdminTicketFilters,
+  AdminUpdateStatusRequest,
+} from '../types';
 
 export const adminApi = {
   // Get dashboard statistics
@@ -206,6 +211,91 @@ export const adminApi = {
       }
       
       throw new Error(response.data.message || 'Failed to update status');
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  // ========================
+  // Admin Parcel Management
+  // ========================
+
+  getAdminParcels: async (filters?: AdminParcelFilters): Promise<AdminParcelsResponse> => {
+    try {
+      const params = new URLSearchParams();
+      if (filters?.search) params.append('search', filters.search);
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.deliveryDate) params.append('deliveryDate', filters.deliveryDate);
+
+      const queryString = params.toString();
+      const url = `/api/admin/parcels${queryString ? `?${queryString}` : ''}`;
+
+      const response = await apiClient.get<ApiResponse<AdminParcelsResponse>>(url);
+
+      if (response.data.statusCode === 200 && response.data.data) {
+        return response.data.data;
+      }
+
+      throw new Error(response.data.message || 'Failed to fetch parcels');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : handleApiError(error);
+      throw new Error(errorMessage);
+    }
+  },
+
+  updateAdminParcelStatus: async (trackingNumber: string, body: AdminUpdateStatusRequest): Promise<void> => {
+    try {
+      const response = await apiClient.patch<ApiResponse<null>>(
+        `/api/admin/parcels/${trackingNumber}/status`,
+        body
+      );
+
+      if (response.data.statusCode !== 200) {
+        throw new Error(response.data.message || 'Failed to update parcel status');
+      }
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  // ========================
+  // Admin Ticket Management
+  // ========================
+
+  getAdminTickets: async (filters?: AdminTicketFilters): Promise<AdminTicketsResponse> => {
+    try {
+      const params = new URLSearchParams();
+      if (filters?.search) params.append('search', filters.search);
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.seatClass) params.append('seatClass', filters.seatClass);
+      if (filters?.travelDate) params.append('travelDate', filters.travelDate);
+
+      const queryString = params.toString();
+      const url = `/api/admin/tickets${queryString ? `?${queryString}` : ''}`;
+
+      const response = await apiClient.get<ApiResponse<AdminTicketsResponse>>(url);
+
+      if (response.data.statusCode === 200 && response.data.data) {
+        return response.data.data;
+      }
+
+      throw new Error(response.data.message || 'Failed to fetch tickets');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : handleApiError(error);
+      throw new Error(errorMessage);
+    }
+  },
+
+  updateAdminTicketStatus: async (bookingReference: string, body: AdminUpdateStatusRequest): Promise<void> => {
+    try {
+      const response = await apiClient.patch<ApiResponse<null>>(
+        `/api/admin/tickets/${bookingReference}/status`,
+        body
+      );
+
+      if (response.data.statusCode !== 200) {
+        throw new Error(response.data.message || 'Failed to update ticket status');
+      }
     } catch (error) {
       throw new Error(handleApiError(error));
     }

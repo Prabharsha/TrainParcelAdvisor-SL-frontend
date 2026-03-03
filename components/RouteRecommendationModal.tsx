@@ -1,6 +1,7 @@
 'use client';
 
 import { PredictResponse } from '@/lib/api/route';
+import { useStationLookup } from '@/lib/useStationLookup';
 
 interface RouteRecommendationModalProps {
   isOpen: boolean;
@@ -13,6 +14,8 @@ export function RouteRecommendationModal({
   prediction,
   onClose,
 }: RouteRecommendationModalProps) {
+  const { getStationName } = useStationLookup();
+
   if (!isOpen || !prediction) return null;
 
   const getRiskColor = (level: string) => {
@@ -77,12 +80,12 @@ export function RouteRecommendationModal({
 
   // Parse inference path for visual display
   const pathStations = prediction.inference_path
-    ? prediction.inference_path.split('→').map((s) => s.trim())
+    ? prediction.inference_path.split(/\s*(?:→|->)\s*/).filter(Boolean)
     : [prediction.from_station, prediction.to_station];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#1e2837] p-6 rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-[#1e2837] p-6 rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden modal-scrollbar">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-white">Delivery Prediction</h2>
@@ -119,18 +122,21 @@ export function RouteRecommendationModal({
               <span className="block text-xs text-gray-400 uppercase tracking-wide mb-2">
                 Inference Path ({prediction.num_hops} hops)
               </span>
-              <div className="flex items-center flex-wrap gap-1 pb-1">
+              <div className="flex items-center flex-wrap gap-x-0.5 gap-y-2 pb-1">
                 {pathStations.map((station, index) => (
-                  <div key={index} className="flex items-center shrink-0">
-                    <div className={`px-3 py-1.5 rounded-lg font-medium text-sm ${
-                      index === 0 || index === pathStations.length - 1
-                        ? 'bg-[#1a73e8] text-white'
-                        : 'bg-[#3a4a5a] text-gray-200'
-                    }`}>
-                      {station}
+                  <div key={index} className="flex items-center">
+                    <div
+                      className={`px-2 py-1 rounded font-medium text-xs ${
+                        index === 0 || index === pathStations.length - 1
+                          ? 'bg-[#1a73e8] text-white'
+                          : 'bg-[#3a4a5a] text-gray-200'
+                      }`}
+                      title={getStationName(station)}
+                    >
+                      {getStationName(station)}
                     </div>
                     {index < pathStations.length - 1 && (
-                      <svg className="w-4 h-4 text-gray-500 mx-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3 h-3 text-gray-500 mx-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     )}

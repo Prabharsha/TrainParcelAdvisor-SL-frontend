@@ -7,10 +7,12 @@ import Navbar from '@/components/Navbar';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { adminApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import type { DashboardStats } from '@/lib/types';
+import type { DashboardStats, AdminParcelStats, AdminTicketStats } from '@/lib/types';
 
 function AdminDashboardContent() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [parcelStats, setParcelStats] = useState<AdminParcelStats | null>(null);
+  const [ticketStats, setTicketStats] = useState<AdminTicketStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
@@ -23,8 +25,14 @@ function AdminDashboardContent() {
     const loadStats = async () => {
       if (!mounted) return;
       try {
-        const data = await adminApi.getDashboardStats();
-        setStats(data);
+        const [dashboardData, parcelsData, ticketsData] = await Promise.all([
+          adminApi.getDashboardStats(),
+          adminApi.getAdminParcels().catch(() => null),
+          adminApi.getAdminTickets().catch(() => null),
+        ]);
+        setStats(dashboardData);
+        if (parcelsData?.stats) setParcelStats(parcelsData.stats);
+        if (ticketsData?.stats) setTicketStats(ticketsData.stats);
       } catch (error) {
         toast.error('Failed to load dashboard data', {
           description: error instanceof Error ? error.message : 'Please refresh the page',
@@ -79,7 +87,7 @@ function AdminDashboardContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-railway-blue-100 mb-1">Total Tickets</p>
-                <p className="text-3xl font-bold">{stats?.totalTickets || 0}</p>
+                <p className="text-3xl font-bold">{ticketStats?.totalTickets ?? stats?.totalTickets ?? 0}</p>
               </div>
               <FaTicketAlt className="text-4xl text-railway-blue-300" />
             </div>
@@ -101,7 +109,7 @@ function AdminDashboardContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-green-100 mb-1">Total Revenue</p>
-                <p className="text-2xl font-bold">{formatCurrency(stats?.totalRevenue || 0)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(ticketStats?.totalRevenue ?? stats?.totalRevenue ?? 0)}</p>
               </div>
               <FaMoneyBillWave className="text-4xl text-green-300" />
             </div>
@@ -119,15 +127,15 @@ function AdminDashboardContent() {
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
                 <span className="text-gray-700">Pending</span>
-                <span className="font-bold text-yellow-700">{stats?.pendingParcels || 0}</span>
+                <span className="font-bold text-yellow-700">{parcelStats?.pending ?? stats?.pendingParcels ?? 0}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                 <span className="text-gray-700">In Transit</span>
-                <span className="font-bold text-blue-700">{stats?.inTransitParcels || 0}</span>
+                <span className="font-bold text-blue-700">{parcelStats?.inTransit ?? stats?.inTransitParcels ?? 0}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                 <span className="text-gray-700">Delivered</span>
-                <span className="font-bold text-green-700">{stats?.deliveredParcels || 0}</span>
+                <span className="font-bold text-green-700">{parcelStats?.delivered ?? stats?.deliveredParcels ?? 0}</span>
               </div>
             </div>
           </div>
@@ -141,15 +149,15 @@ function AdminDashboardContent() {
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                 <span className="text-gray-700">Active</span>
-                <span className="font-bold text-green-700">{stats?.activeTickets || 0}</span>
+                <span className="font-bold text-green-700">{ticketStats?.activeBookings ?? stats?.activeTickets ?? 0}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <span className="text-gray-700">Used</span>
-                <span className="font-bold text-gray-700">{stats?.usedTickets || 0}</span>
+                <span className="text-gray-700">Completed</span>
+                <span className="font-bold text-gray-700">{ticketStats?.completed ?? stats?.usedTickets ?? 0}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
                 <span className="text-gray-700">Cancelled</span>
-                <span className="font-bold text-red-700">{stats?.cancelledTickets || 0}</span>
+                <span className="font-bold text-red-700">{stats?.cancelledTickets ?? 0}</span>
               </div>
             </div>
           </div>

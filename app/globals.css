@@ -95,3 +95,27 @@
     display: none;
   }
 }
+
+/* Custom scrollbar for the delivery prediction modal */
+.modal-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-scrollbar::-webkit-scrollbar-track {
+  background: #1e2837;
+  border-radius: 4px;
+}
+
+.modal-scrollbar::-webkit-scrollbar-thumb {
+  background: #3a4a5a;
+  border-radius: 4px;
+}
+
+.modal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4a5a6a;
+}
+
+.modal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #3a4a5a #1e2837;
+}

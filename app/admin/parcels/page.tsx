@@ -1,25 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { adminApi } from '@/lib/api/admin';
-
-interface Parcel {
-  id: number;
-  trackingNumber: string;
-  senderName: string;
-  senderMobile: string;
-  receiverName: string;
-  receiverMobile: string;
-  fromStation: string;
-  toStation: string;
-  weightInKg: number;
-  travelDate: string;
-  totalPrice: number;
-  status: string;
-  createdDateTime: string;
-}
+import { useStationLookup } from '@/lib/useStationLookup';
+import type { AdminParcel, AdminParcelStats } from '@/lib/types';
 
 export default function AdminParcelsPage() {
   return (
@@ -31,98 +17,103 @@ export default function AdminParcelsPage() {
 
 function AdminParcelsContent() {
   const router = useRouter();
-  const [parcels, setParcels] = useState<Parcel[]>([]);
-  const [filteredParcels, setFilteredParcels] = useState<Parcel[]>([]);
+  const { getStationName } = useStationLookup();
+  const [parcels, setParcels] = useState<AdminParcel[]>([]);
+  const [stats, setStats] = useState<AdminParcelStats>({ totalParcels: 0, pending: 0, inTransit: 0, delivered: 0 });
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const isInitialLoad = useRef(true);
 
-  // Set mounted flag after first render to prevent hydration mismatch
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (mounted) {
-      fetchParcels();
-    }
-  }, [mounted]);
-
-  useEffect(() => {
-    applyFilters();
-  }, [searchTerm, statusFilter, dateFilter, parcels]);
-
-  const fetchParcels = async () => {
+  const fetchParcels = useCallback(async (search?: string, status?: string, deliveryDate?: string) => {
     try {
       setLoading(true);
-      const data = await adminApi.getAllParcels();
-      setParcels(data);
-      setFilteredParcels(data);
+      const data = await adminApi.getAdminParcels({
+        search: search || undefined,
+        status: status || undefined,
+        deliveryDate: deliveryDate || undefined,
+      });
+      setStats(data.stats);
+      setParcels(data.parcels);
+      setTotalCount(data.totalCount);
     } catch (error) {
       console.error('Error fetching parcels:', error);
       alert('Failed to load parcels');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const applyFilters = () => {
-    let filtered = [...parcels];
+  // Fetch with debounce for search, immediate for other filters
+  useEffect(() => {
+    if (!mounted) return;
 
-    // Search filter
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (p) =>
-          p.trackingNumber.toLowerCase().includes(search) ||
-          p.senderName.toLowerCase().includes(search) ||
-          p.receiverName.toLowerCase().includes(search) ||
-          p.fromStation.toLowerCase().includes(search) ||
-          p.toStation.toLowerCase().includes(search)
-      );
-    }
-
-    // Status filter
-    if (statusFilter !== 'ALL') {
-      filtered = filtered.filter((p) => p.status === statusFilter);
-    }
-
-    // Date filter
-    if (dateFilter) {
-      filtered = filtered.filter((p) => p.travelDate === dateFilter);
-    }
-
-    setFilteredParcels(filtered);
-  };
-
-  const handleUpdateStatus = async (parcelId: number, newStatus: string) => {
-    try {
-      await adminApi.updateParcelStatus(parcelId, newStatus);
-      alert('Parcel status updated successfully');
+    // Skip debounce on initial load
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
       fetchParcels();
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetchParcels(searchTerm, statusFilter, dateFilter);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, statusFilter, dateFilter, mounted, fetchParcels]);
+
+  const handleUpdateStatus = async (trackingNumber: string, newStatus: string) => {
+    try {
+      setUpdatingStatus(trackingNumber);
+      const userEmail = typeof window !== 'undefined' ? localStorage.getItem('userEmail') || '' : '';
+      await adminApi.updateAdminParcelStatus(trackingNumber, {
+        status: newStatus,
+        updatedBy: userEmail,
+      });
+      alert('Parcel status updated successfully');
+      fetchParcels(searchTerm, statusFilter, dateFilter);
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Failed to update parcel status');
+    } finally {
+      setUpdatingStatus(null);
     }
   };
 
   const getStatusBadge = (status: string) => {
-    const styles = {
+    const styles: Record<string, string> = {
       PENDING: 'bg-yellow-100 text-yellow-800',
+      ACCEPTED: 'bg-blue-100 text-blue-800',
       IN_TRANSIT: 'bg-blue-100 text-blue-800',
+      ARRIVED: 'bg-teal-100 text-teal-800',
+      READY_FOR_PICKUP: 'bg-purple-100 text-purple-800',
       DELIVERED: 'bg-green-100 text-green-800',
       CANCELLED: 'bg-red-100 text-red-800',
+      REJECTED: 'bg-red-100 text-red-800',
     };
-    return styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-800';
+    return styles[status] || 'bg-gray-100 text-gray-800';
   };
 
-  const stats = {
-    total: parcels.length,
-    pending: parcels.filter((p) => p.status === 'PENDING').length,
-    inTransit: parcels.filter((p) => p.status === 'IN_TRANSIT').length,
-    delivered: parcels.filter((p) => p.status === 'DELIVERED').length,
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      PENDING: 'Pending',
+      ACCEPTED: 'Accepted',
+      IN_TRANSIT: 'In Transit',
+      ARRIVED: 'Arrived',
+      READY_FOR_PICKUP: 'Ready for Pickup',
+      DELIVERED: 'Delivered',
+      CANCELLED: 'Cancelled',
+      REJECTED: 'Rejected',
+    };
+    return labels[status] || status;
   };
 
   const formatCurrency = (amount: number) => {
@@ -132,8 +123,12 @@ function AdminParcelsContent() {
     }).format(amount);
   };
 
+  const isTerminalStatus = (status: string) => {
+    return ['DELIVERED', 'CANCELLED', 'REJECTED'].includes(status);
+  };
+
   // Don't render loading state on initial server render
-  if (!mounted || loading) {
+  if (!mounted) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-railway-blue-50 to-railway-gold-50 flex items-center justify-center">
         <div className="text-center">
@@ -164,7 +159,7 @@ function AdminParcelsContent() {
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="text-3xl font-bold text-railway-blue-700">{stats.total}</div>
+            <div className="text-3xl font-bold text-railway-blue-700">{stats.totalParcels}</div>
             <div className="text-gray-600 mt-1">Total Parcels</div>
           </div>
           <div className="bg-yellow-50 rounded-lg shadow-md p-6">
@@ -188,7 +183,7 @@ function AdminParcelsContent() {
               <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
               <input
                 type="text"
-                placeholder="Tracking, sender, receiver, station..."
+                placeholder="Tracking, sender, receiver, station, NIC..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="input"
@@ -201,15 +196,19 @@ function AdminParcelsContent() {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="input"
               >
-                <option value="ALL">All Statuses</option>
+                <option value="">All Statuses</option>
                 <option value="PENDING">Pending</option>
+                <option value="ACCEPTED">Accepted</option>
                 <option value="IN_TRANSIT">In Transit</option>
+                <option value="ARRIVED">Arrived</option>
+                <option value="READY_FOR_PICKUP">Ready for Pickup</option>
                 <option value="DELIVERED">Delivered</option>
                 <option value="CANCELLED">Cancelled</option>
+                <option value="REJECTED">Rejected</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Travel Date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Delivery Date</label>
               <input
                 type="date"
                 value={dateFilter}
@@ -222,6 +221,11 @@ function AdminParcelsContent() {
 
         {/* Parcels Table */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {loading && (
+            <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-railway-red-600"></div>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-railway-blue-700 text-white">
@@ -231,21 +235,21 @@ function AdminParcelsContent() {
                   <th className="py-3 px-4 text-left">Receiver</th>
                   <th className="py-3 px-4 text-left">Route</th>
                   <th className="py-3 px-4 text-left">Weight</th>
-                  <th className="py-3 px-4 text-left">Travel Date</th>
+                  <th className="py-3 px-4 text-left">Delivery Date</th>
                   <th className="py-3 px-4 text-left">Amount</th>
                   <th className="py-3 px-4 text-left">Status</th>
                   <th className="py-3 px-4 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredParcels.length === 0 ? (
+                {parcels.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-8 text-center text-gray-500">
-                      No parcels found
+                      {loading ? 'Loading parcels...' : 'No parcels found'}
                     </td>
                   </tr>
                 ) : (
-                  filteredParcels.map((parcel) => (
+                  parcels.map((parcel) => (
                     <tr key={parcel.id} className="hover:bg-gray-50">
                       <td className="py-3 px-4">
                         <span className="font-mono text-sm font-semibold text-railway-blue-700">
@@ -259,22 +263,19 @@ function AdminParcelsContent() {
                         </div>
                       </td>
                       <td className="py-3 px-4">
-                        <div>
-                          <div className="font-medium">{parcel.receiverName}</div>
-                          <div className="text-sm text-gray-500">{parcel.receiverMobile}</div>
-                        </div>
+                        <div className="font-medium">{parcel.receiverName}</div>
                       </td>
                       <td className="py-3 px-4">
                         <div className="text-sm">
-                          <div>{parcel.fromStation} →</div>
-                          <div>{parcel.toStation}</div>
+                          <div>{getStationName(parcel.startingDestination)} →</div>
+                          <div>{getStationName(parcel.destination)}</div>
                         </div>
                       </td>
                       <td className="py-3 px-4">{parcel.weightInKg} kg</td>
-                      <td className="py-3 px-4">{parcel.travelDate}</td>
+                      <td className="py-3 px-4">{parcel.deliveryDate}</td>
                       <td className="py-3 px-4">
                         <span className="font-semibold text-railway-gold-700">
-                          {formatCurrency(parcel.totalPrice)}
+                          {formatCurrency(parcel.totalCharge)}
                         </span>
                       </td>
                       <td className="py-3 px-4">
@@ -283,20 +284,24 @@ function AdminParcelsContent() {
                             parcel.status
                           )}`}
                         >
-                          {parcel.status}
+                          {getStatusLabel(parcel.status)}
                         </span>
                       </td>
                       <td className="py-3 px-4">
                         <select
                           value={parcel.status}
-                          onChange={(e) => handleUpdateStatus(parcel.id, e.target.value)}
+                          onChange={(e) => handleUpdateStatus(parcel.trackingNumber, e.target.value)}
                           className="text-sm border border-gray-300 rounded px-2 py-1"
-                          disabled={parcel.status === 'DELIVERED' || parcel.status === 'CANCELLED'}
+                          disabled={isTerminalStatus(parcel.status) || updatingStatus === parcel.trackingNumber}
                         >
                           <option value="PENDING">Pending</option>
+                          <option value="ACCEPTED">Accepted</option>
                           <option value="IN_TRANSIT">In Transit</option>
+                          <option value="ARRIVED">Arrived</option>
+                          <option value="READY_FOR_PICKUP">Ready for Pickup</option>
                           <option value="DELIVERED">Delivered</option>
                           <option value="CANCELLED">Cancelled</option>
+                          <option value="REJECTED">Rejected</option>
                         </select>
                       </td>
                     </tr>
@@ -309,7 +314,7 @@ function AdminParcelsContent() {
 
         {/* Results Summary */}
         <div className="mt-4 text-center text-gray-600">
-          Showing {filteredParcels.length} of {parcels.length} parcels
+          Showing {totalCount} of {stats.totalParcels} parcels
         </div>
       </div>
     </div>

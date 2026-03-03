@@ -7,11 +7,13 @@ import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { ticketApi, authApi } from '@/lib/api';
+import { useStationLookup } from '@/lib/useStationLookup';
 import { formatCurrency, formatDateTime, getStatusColor } from '@/lib/utils';
 import type { Ticket } from '@/lib/types';
 
 function MyBookingsContent() {
   const router = useRouter();
+  const { getStationName } = useStationLookup();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -176,11 +178,11 @@ function MyBookingsContent() {
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">From:</span>
-                    <span className="font-medium">{ticket.fromStation || ticket.originStation}</span>
+                    <span className="font-medium">{getStationName(ticket.fromStation || ticket.originStation)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">To:</span>
-                    <span className="font-medium">{ticket.toStation || ticket.destinationStation}</span>
+                    <span className="font-medium">{getStationName(ticket.toStation || ticket.destinationStation)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Train:</span>

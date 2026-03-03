@@ -84,15 +84,11 @@ export default function BookTicketPage() {
   const calculateFare = async () => {
     if (!originStation || !destinationStation || !seatClass || !numberOfPassengers) return;
 
-    // Resolve station codes to names for the backend API
-    const originName = stations.find((s) => s.code === originStation)?.name || originStation;
-    const destinationName = stations.find((s) => s.code === destinationStation)?.name || destinationStation;
-
     setIsCalculating(true);
     try {
       const fare = await ticketApi.calculateFare({
-        originStation: originName,
-        destinationStation: destinationName,
+        originStation,
+        destinationStation,
         seatClass,
         numberOfPassengers,
       });

@@ -17,6 +17,7 @@ export default function BookParcelPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [calculatedCharges, setCalculatedCharges] = useState<number | null>(null);
+  const [chargeError, setChargeError] = useState(false);
   const [stations, setStations] = useState<Station[]>([]);
   const [parcelTypes, setParcelTypes] = useState<ParcelType[]>([]);
   const [trains, setTrains] = useState<Train[]>([]);
@@ -83,13 +84,11 @@ export default function BookParcelPage() {
   const calculateCharges = async () => {
     if (!destination || !parcelType || !numberOfParcels || !weightInKg) return;
 
-    // Resolve station code to name for the backend API
-    const destinationName = stations.find((s) => s.code === destination)?.name || destination;
-
     setIsCalculating(true);
+    setChargeError(false);
     try {
       const charges = await parcelApi.calculateCharges({
-        destination: destinationName,
+        destination,
         parcelType,
         numberOfParcels,
         weightInKg,
@@ -98,6 +97,8 @@ export default function BookParcelPage() {
       setCalculatedCharges(isNaN(total) ? 0 : total);
     } catch (error) {
       console.error('Calculation error:', error);
+      setChargeError(true);
+      setCalculatedCharges(null);
     } finally {
       setIsCalculating(false);
     }
@@ -523,18 +524,29 @@ export default function BookParcelPage() {
             </div>
 
             {/* Calculated Charges */}
-            {calculatedCharges !== null && (
-              <div className="card bg-railway-gold-50 border-2 border-railway-gold-700">
+            {(destination && parcelType && numberOfParcels && weightInKg) && (
+              <div className={`card border-2 ${
+                chargeError ? 'bg-red-50 border-red-300' : 'bg-railway-gold-50 border-railway-gold-700'
+              }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <FaCalculator className="text-3xl text-railway-gold-700" />
+                    <FaCalculator className={`text-3xl ${
+                      chargeError ? 'text-red-500' : 'text-railway-gold-700'
+                    }`} />
                     <div>
                       <p className="text-sm text-gray-600">Estimated Total Charges</p>
                       <p className="text-3xl font-bold text-railway-blue-900">
                         {isCalculating ? (
-                          <FaSpinner className="animate-spin" />
-                        ) : (
+                          <span className="flex items-center gap-2">
+                            <FaSpinner className="animate-spin text-xl" />
+                            <span className="text-lg text-gray-500">Calculating...</span>
+                          </span>
+                        ) : chargeError ? (
+                          <span className="text-lg text-red-600">Unable to calculate. Please verify your selections.</span>
+                        ) : calculatedCharges !== null ? (
                           formatCurrency(calculatedCharges)
+                        ) : (
+                          <span className="text-lg text-gray-400">--</span>
                         )}
                       </p>
                     </div>
