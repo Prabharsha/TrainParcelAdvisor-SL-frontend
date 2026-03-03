@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import Navbar from '@/components/Navbar';
 import { RouteRecommendationModal } from '@/components/RouteRecommendationModal';
 import { parcelApi, publicApi } from '@/lib/api';
-import { routeApi, RouteRecommendation } from '@/lib/api/route';
+import { routeApi, PredictResponse } from '@/lib/api/route';
 import { bookParcelSchema, type BookParcelFormData } from '@/lib/validations';
 import { formatCurrency, getMinBookingDate, getMaxBookingDate } from '@/lib/utils';
 import type { Station, ParcelType, Train } from '@/lib/types';
@@ -25,10 +25,10 @@ export default function BookParcelPage() {
     qrCode: string;
   } | null>(null);
   
-  // Route recommendation state
+  // Delivery prediction state
   const [showRouteModal, setShowRouteModal] = useState(false);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
-  const [routeRecommendation, setRouteRecommendation] = useState<RouteRecommendation | null>(null);
+  const [deliveryPrediction, setDeliveryPrediction] = useState<PredictResponse | null>(null);
   const [showRecommendationButton, setShowRecommendationButton] = useState(false);
 
   const {
@@ -83,15 +83,19 @@ export default function BookParcelPage() {
   const calculateCharges = async () => {
     if (!destination || !parcelType || !numberOfParcels || !weightInKg) return;
 
+    // Resolve station code to name for the backend API
+    const destinationName = stations.find((s) => s.code === destination)?.name || destination;
+
     setIsCalculating(true);
     try {
       const charges = await parcelApi.calculateCharges({
-        destination,
+        destination: destinationName,
         parcelType,
         numberOfParcels,
         weightInKg,
       });
-      setCalculatedCharges(charges.total);
+      const total = charges?.total ?? charges?.baseRate ?? 0;
+      setCalculatedCharges(isNaN(total) ? 0 : total);
     } catch (error) {
       console.error('Calculation error:', error);
     } finally {
@@ -99,7 +103,7 @@ export default function BookParcelPage() {
     }
   };
 
-  const handleGetRouteRecommendation = async () => {
+  const handleGetDeliveryPrediction = async () => {
     const travelDate = watch('date');
     const startingDestination = watch('startingDestination');
     const endingDestination = watch('destination');
@@ -112,27 +116,24 @@ export default function BookParcelPage() {
     setIsLoadingRoute(true);
     
     try {
-      const recommendation = await routeApi.getRouteRecommendation({
+      const prediction = await routeApi.getDeliveryPrediction({
+        from_station: startingDestination,
+        to_station: endingDestination,
+        weather: {},  // Use API defaults for weather
         booking_date: travelDate,
-        start_station: startingDestination,
-        end_station: endingDestination,
+        booking_time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
       });
       
-      setRouteRecommendation(recommendation);
+      setDeliveryPrediction(prediction);
       setShowRouteModal(true);
       setShowRecommendationButton(false);
     } catch (error) {
-      toast.error('Failed to get route recommendation', {
+      toast.error('Failed to get delivery prediction', {
         description: error instanceof Error ? error.message : 'Please try again',
       });
     } finally {
       setIsLoadingRoute(false);
     }
-  };
-
-  const handleConfirmRoute = () => {
-    setShowRouteModal(false);
-    toast.success('Route recommendation noted');
   };
 
   // DEV ONLY - Fill test data
@@ -175,14 +176,15 @@ export default function BookParcelPage() {
     setIsLoading(true);
     try {
       const result = await parcelApi.bookParcel(data);
+      console.log('Book parcel API result:', JSON.stringify(result));
       
       setBookingSuccess({
-        trackingNumber: result.trackingNumber,
-        qrCode: result.qrCodeBase64,
+        trackingNumber: result.trackingNumber || result.message || '',
+        qrCode: result.qrCodeBase64 || '',
       });
 
       toast.success('Parcel booked successfully!', {
-        description: `Tracking Number: ${result.trackingNumber}`,
+        description: `Tracking Number: ${result.trackingNumber || result.message}`,
       });
     } catch (error) {
       toast.error('Booking failed', {
@@ -541,29 +543,29 @@ export default function BookParcelPage() {
               </div>
             )}
 
-            {/* Route Recommendation Button */}
+            {/* Delivery Prediction Button */}
             {watch('startingDestination') && watch('destination') && watch('date') && (
               <div className="card bg-blue-50 border-2 border-blue-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-blue-900">Get Smart Route Recommendation</p>
+                    <p className="font-semibold text-blue-900">Predict Delivery Duration & Weather Risk</p>
                     <p className="text-sm text-blue-700 mt-1">
-                      Let our ML model analyze the best route based on current conditions
+                      Get AI-powered delivery time prediction with weather-risk analysis
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={handleGetRouteRecommendation}
+                    onClick={handleGetDeliveryPrediction}
                     disabled={isLoadingRoute}
                     className="btn-secondary whitespace-nowrap ml-4 flex items-center gap-2"
                   >
                     {isLoadingRoute ? (
                       <>
                         <FaSpinner className="animate-spin" />
-                        Analyzing...
+                        Predicting...
                       </>
                     ) : (
-                      '🚂 Get Recommendation'
+                      '🚂 Get Prediction'
                     )}
                   </button>
                 </div>
@@ -592,10 +594,10 @@ export default function BookParcelPage() {
         </div>
       </div>
 
-      {/* Route Recommendation Modal */}
+      {/* Delivery Prediction Modal */}
       <RouteRecommendationModal
         isOpen={showRouteModal}
-        recommendation={routeRecommendation}
+        prediction={deliveryPrediction}
         onClose={() => setShowRouteModal(false)}
       />
     </div>

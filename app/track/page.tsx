@@ -95,7 +95,7 @@ export default function TrackPage() {
               <FaBox />
               Track Parcel
             </button>
-            <button
+            {/* <button
               onClick={() => {
                 setTrackingType('ticket');
                 setParcelResult(null);
@@ -109,7 +109,7 @@ export default function TrackPage() {
             >
               <FaTicketAlt />
               Track Ticket
-            </button>
+            </button> */}
           </div>
 
           {/* Search Form */}
