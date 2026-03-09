@@ -201,56 +201,6 @@ npx tsc --noEmit     # Check TypeScript errors
 ### Features
 - **QRCode** - QR code generation
 
-## 🚧 Development Roadmap
-
-### Phase 1: Core Features ✅
-- [x] Project setup
-- [x] API integration layer
-- [x] Type definitions
-- [x] Validation schemas
-- [x] Utility functions
-
-### Phase 2: Authentication 🔄
-- [ ] Login page
-- [ ] Protected routes
-- [ ] User context
-- [ ] Role-based access
-
-### Phase 3: Parcel System 📦
-- [ ] Booking form
-- [ ] Tracking page
-- [ ] My parcels
-- [ ] Status updates
-
-### Phase 4: Ticket System 🎫
-- [ ] Booking form
-- [ ] Tracking page
-- [ ] My bookings
-- [ ] Cancellation
-
-### Phase 5: Admin Panel 👨‍💼
-- [ ] Dashboard
-- [ ] User management
-- [ ] Station management
-- [ ] Train management
-- [ ] Analytics
-
-### Phase 6: Polish ✨
-- [ ] Responsive design
-- [ ] Animations
-- [ ] Loading states
-- [ ] Error handling
-- [ ] Accessibility
-
-## 🤝 Contributing
-
-This is a final year project for ICBT. For questions or improvements:
-
-1. Review existing documentation
-2. Check TypeScript types
-3. Follow the established patterns
-4. Maintain code quality
-
 ## 📄 License
 
 © 2026 Sri Lankan Railway Department. All rights reserved.
