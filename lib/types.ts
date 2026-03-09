@@ -381,3 +381,96 @@ export interface AdminUpdateStatusRequest {
 export interface FormErrors {
   [key: string]: string;
 }
+
+// ========================
+// QR Scan & Tracking Event Types
+// ========================
+
+export interface ParcelTrackingEvent {
+  id: number;
+  trackingNumber: string;
+  previousStatus: ParcelStatus | null;
+  newStatus: ParcelStatus;
+  stationCode: string;
+  stationName: string;
+  updatedBy: string;
+  remarks: string | null;
+  eventTimestamp: string;
+  scanMethod: 'QR_SCAN' | 'MANUAL';
+}
+
+export interface QrScanUpdateRequest {
+  status: ParcelStatus;
+  remarks?: string;
+  stationCode: string;
+  updatedBy: string;
+  scanMethod: 'QR_SCAN' | 'MANUAL';
+}
+
+// Station Parcel (returned by station-master endpoints)
+export interface StationParcel {
+  trackingNumber: string;
+  senderName: string;
+  senderMobile: string;
+  senderEmail: string;
+  startingDestination: string;
+  destination: string;
+  receiverName: string;
+  receiverEmail: string;
+  parcelType: string;
+  numberOfParcels: number;
+  deliveryDate: string;
+  weightInKg: number;
+  trainNumber: string;
+  totalCharge: number;
+  status: ParcelStatus;
+  statusUpdatedAt: string | null;
+  statusUpdatedBy: string | null;
+  remarks: string | null;
+  createdDateTime: string;
+}
+
+// ========================
+// Analytics & Report Types
+// ========================
+
+export interface AnalyticsSummary {
+  totalParcels: number;
+  totalRevenue: number;
+  deliveredCount: number;
+  pendingCount: number;
+  inTransitCount: number;
+  avgWeight: number;
+}
+
+export interface DailyAnalytics {
+  date: string;
+  parcelCount: number;
+  revenue: number;
+}
+
+export interface StatusDistribution {
+  status: string;
+  count: number;
+}
+
+export interface StationAnalytics {
+  stationCode: string;
+  stationName: string;
+  parcelCount: number;
+  totalRevenue: number;
+}
+
+export interface AnalyticsResponse {
+  summary?: AnalyticsSummary;
+  dailyTrends?: DailyAnalytics[];
+  statusDistribution?: StatusDistribution[];
+  topStations?: StationAnalytics[];
+}
+
+export interface ReportFilters {
+  startDate?: string;
+  endDate?: string;
+  status?: string;
+  stationCode?: string;
+}

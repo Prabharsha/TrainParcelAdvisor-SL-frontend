@@ -4,6 +4,8 @@ import type {
   AdminParcelsResponse, AdminParcelFilters,
   AdminTicketsResponse, AdminTicketFilters,
   AdminUpdateStatusRequest,
+  StationParcel,
+  QrScanUpdateRequest,
 } from '../types';
 
 export const adminApi = {
@@ -296,6 +298,53 @@ export const adminApi = {
       if (response.data.statusCode !== 200) {
         throw new Error(response.data.message || 'Failed to update ticket status');
       }
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  // ========================
+  // Station Master - QR Scan Operations
+  // ========================
+
+  scanAndLookupParcel: async (trackingNumber: string): Promise<StationParcel> => {
+    try {
+      const response = await apiClient.get<ApiResponse<StationParcel>>(
+        `/api/station-master/parcels/scan/${trackingNumber}`
+      );
+      if (response.data.statusCode === 200 && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Parcel not found');
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  scanAndUpdateParcel: async (trackingNumber: string, request: QrScanUpdateRequest): Promise<StationParcel> => {
+    try {
+      const response = await apiClient.post<ApiResponse<StationParcel>>(
+        `/api/station-master/parcels/scan/${trackingNumber}/update`,
+        request
+      );
+      if (response.data.statusCode === 200 && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to update parcel');
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  getStationParcels: async (stationCode: string): Promise<StationParcel[]> => {
+    try {
+      const response = await apiClient.get<ApiResponse<StationParcel[]>>(
+        `/api/station-master/parcels/all/${stationCode}`
+      );
+      if (response.data.statusCode === 200 && response.data.data) {
+        return response.data.data;
+      }
+      return [];
     } catch (error) {
       throw new Error(handleApiError(error));
     }

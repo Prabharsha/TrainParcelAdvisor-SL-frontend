@@ -23,6 +23,22 @@ async function loadStations(): Promise<Station[]> {
 }
 
 /**
+ * Resolves a raw station value (which may be a 3-letter code like "FOT" or a
+ * name-slug like "COLOMBO_FORT" stored in the JWT) to the actual station code.
+ * Uses the module-level station cache so the list is only fetched once.
+ */
+export async function resolveStationCode(raw: string): Promise<string> {
+  if (!raw) return raw;
+  const stations = await loadStations();
+  // Already a valid code – return as-is
+  if (stations.some((s) => s.code === raw)) return raw;
+  // Name-slug match: COLOMBO_FORT → "COLOMBO FORT" vs station.name.toUpperCase()
+  const normalized = raw.replace(/_/g, ' ').toUpperCase();
+  const match = stations.find((s) => s.name.toUpperCase() === normalized);
+  return match?.code ?? raw;
+}
+
+/**
  * Hook that provides a station code → full name lookup.
  * Fetches stations once and caches them globally.
  */

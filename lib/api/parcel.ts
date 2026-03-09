@@ -6,6 +6,7 @@ import type {
   BookParcelResponse,
   Parcel,
   ApiResponse,
+  ParcelTrackingEvent,
 } from '../types';
 
 export const parcelApi = {
@@ -130,14 +131,29 @@ export const parcelApi = {
         '/api/stationmaster/parcel/status',
         { parcelId, status, remarks }
       );
-      
+
       if (response.data.statusCode === 200 && response.data.data) {
         return response.data.data;
       }
-      
+
       throw new Error(response.data.message || 'Failed to update status');
     } catch (error) {
       throw new Error(handleApiError(error));
+    }
+  },
+
+  // Get tracking events for a parcel
+  getTrackingEvents: async (trackingNumber: string): Promise<ParcelTrackingEvent[]> => {
+    try {
+      const response = await apiClient.get<ApiResponse<ParcelTrackingEvent[]>>(
+        `/api/customer/parcel/track/${trackingNumber}/events`
+      );
+      if (response.data.statusCode === 200 && response.data.data) {
+        return response.data.data;
+      }
+      return [];
+    } catch (error) {
+      return []; // Return empty array if endpoint fails
     }
   },
 };
