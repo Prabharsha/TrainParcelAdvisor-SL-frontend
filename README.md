@@ -36,28 +36,23 @@ A modern web application for Sri Lankan Railway Department's parcel management a
 
 ### Installation
 
-1. **Clone or navigate to the project**
-   ```bash
-   cd "D:\Personal\ICBT\Final Project\Project\Frontend"
-   ```
-
-2. **Install dependencies**
+1. **Install dependencies**
    ```bash
    npm install
    ```
 
-3. **Configure environment**
+2. **Configure environment**
    ```bash
    # .env.local file should contain:
    NEXT_PUBLIC_API_BASE_URL=http://localhost:8082
    ```
 
-4. **Run development server**
+3. **Run development server**
    ```bash
    npm run dev
    ```
 
-5. **Open browser**
+4. **Open browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
 ## 📁 Project Structure
@@ -170,9 +165,6 @@ npx tsc --noEmit     # Check TypeScript errors
 ## 📚 Documentation
 
 - **[SETUP_COMPLETE.md](./SETUP_COMPLETE.md)** - Setup completion status
-- **[API_DOCUMENTATION.md](./API_DOCUMENTATION.md)** - Complete API reference
-- **[FRONTEND_API_INTEGRATION.md](./FRONTEND_API_INTEGRATION.md)** - Integration guide
-- **[PROJECT_SPECIFICATION.md](./PROJECT_SPECIFICATION.md)** - Project requirements
 
 ## 🔐 Test Credentials
 
