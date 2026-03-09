@@ -6,6 +6,7 @@ import type {
   BookParcelResponse,
   Parcel,
   ApiResponse,
+  ParcelTrackingEvent,
 } from '../types';
 
 export const parcelApi = {
@@ -34,12 +35,41 @@ export const parcelApi = {
         '/api/parcel/book',
         data
       );
-      
-      if (response.data.statusCode === 200 && response.data.data) {
-        return response.data.data;
+
+      console.log('Book parcel raw response:', JSON.stringify(response.data));
+      const raw = response.data as any;
+      const statusOk = raw.statusCode === 200 || raw.statusCode === 201;
+
+      if (statusOk) {
+        const inner = raw.data;
+
+        // data is null/undefined — tracking number likely in message
+        if (!inner) {
+          return {
+            trackingNumber: raw.message || '',
+            qrCodeBase64: '',
+            message: raw.message || 'Parcel booked successfully',
+          };
+        }
+
+        // data is a string (e.g. just the tracking number)
+        if (typeof inner === 'string') {
+          return {
+            trackingNumber: inner,
+            qrCodeBase64: '',
+            message: raw.message || 'Parcel booked successfully',
+          };
+        }
+
+        // data is an object
+        return {
+          trackingNumber: inner.trackingNumber || inner.tracking_number || inner.parcelTrackingNumber || raw.message || '',
+          qrCodeBase64: inner.qrCodeBase64 || inner.qr_code_base64 || inner.qrCode || '',
+          message: inner.message || raw.message || 'Parcel booked successfully',
+        };
       }
       
-      throw new Error(response.data.message || 'Failed to book parcel');
+      throw new Error(raw.message || 'Failed to book parcel');
     } catch (error) {
       throw new Error(handleApiError(error));
     }
@@ -101,14 +131,29 @@ export const parcelApi = {
         '/api/stationmaster/parcel/status',
         { parcelId, status, remarks }
       );
-      
+
       if (response.data.statusCode === 200 && response.data.data) {
         return response.data.data;
       }
-      
+
       throw new Error(response.data.message || 'Failed to update status');
     } catch (error) {
       throw new Error(handleApiError(error));
+    }
+  },
+
+  // Get tracking events for a parcel
+  getTrackingEvents: async (trackingNumber: string): Promise<ParcelTrackingEvent[]> => {
+    try {
+      const response = await apiClient.get<ApiResponse<ParcelTrackingEvent[]>>(
+        `/api/customer/parcel/track/${trackingNumber}/events`
+      );
+      if (response.data.statusCode === 200 && response.data.data) {
+        return response.data.data;
+      }
+      return [];
+    } catch (error) {
+      return []; // Return empty array if endpoint fails
     }
   },
 };

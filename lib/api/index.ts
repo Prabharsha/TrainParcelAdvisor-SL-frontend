@@ -5,3 +5,4 @@ export * from './public';
 export * from './parcel';
 export * from './ticket';
 export * from './admin';
+export * from './report';

@@ -2,6 +2,7 @@
 
 // Format currency (LKR)
 export const formatCurrency = (amount: number): string => {
+  if (amount == null || isNaN(amount)) return 'LKR 0.00';
   return new Intl.NumberFormat('en-LK', {
     style: 'currency',
     currency: 'LKR',

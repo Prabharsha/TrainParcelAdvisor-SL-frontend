@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import Navbar from '@/components/Navbar';
 import { RouteRecommendationModal } from '@/components/RouteRecommendationModal';
 import { ticketApi, publicApi } from '@/lib/api';
-import { routeApi, RouteRecommendation } from '@/lib/api/route';
+import { routeApi, PredictResponse } from '@/lib/api/route';
 import { bookTicketSchema, type BookTicketFormData } from '@/lib/validations';
 import { formatCurrency, getMinBookingDate, getMaxBookingDate } from '@/lib/utils';
 import type { Station, Train } from '@/lib/types';
@@ -30,10 +30,10 @@ export default function BookTicketPage() {
     qrCode: string;
   } | null>(null);
   
-  // Route recommendation state
+  // Delivery prediction state
   const [showRouteModal, setShowRouteModal] = useState(false);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
-  const [routeRecommendation, setRouteRecommendation] = useState<RouteRecommendation | null>(null);
+  const [deliveryPrediction, setDeliveryPrediction] = useState<PredictResponse | null>(null);
 
   const {
     register,
@@ -92,7 +92,8 @@ export default function BookTicketPage() {
         seatClass,
         numberOfPassengers,
       });
-      setCalculatedFare(fare.total);
+      const total = fare?.total ?? fare?.baseFare ?? 0;
+      setCalculatedFare(isNaN(total) ? 0 : total);
     } catch (error) {
       console.error('Calculation error:', error);
     } finally {
@@ -100,7 +101,7 @@ export default function BookTicketPage() {
     }
   };
 
-  const handleGetRouteRecommendation = async () => {
+  const handleGetDeliveryPrediction = async () => {
     const travelDate = watch('travelDate');
     const origin = watch('originStation');
     const destination = watch('destinationStation');
@@ -113,26 +114,23 @@ export default function BookTicketPage() {
     setIsLoadingRoute(true);
     
     try {
-      const recommendation = await routeApi.getRouteRecommendation({
+      const prediction = await routeApi.getDeliveryPrediction({
+        from_station: origin,
+        to_station: destination,
+        weather: {},  // Use API defaults for weather
         booking_date: travelDate,
-        start_station: origin,
-        end_station: destination,
+        booking_time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
       });
       
-      setRouteRecommendation(recommendation);
+      setDeliveryPrediction(prediction);
       setShowRouteModal(true);
     } catch (error) {
-      toast.error('Failed to get route recommendation', {
+      toast.error('Failed to get delivery prediction', {
         description: error instanceof Error ? error.message : 'Please try again',
       });
     } finally {
       setIsLoadingRoute(false);
     }
-  };
-
-  const handleConfirmRoute = () => {
-    setShowRouteModal(false);
-    toast.success('Route recommendation noted');
   };
 
   // DEV ONLY - Fill test data
@@ -460,29 +458,29 @@ export default function BookTicketPage() {
               </div>
             )}
 
-            {/* Route Recommendation Button */}
+            {/* Delivery Prediction Button */}
             {watch('originStation') && watch('destinationStation') && watch('travelDate') && (
               <div className="card bg-blue-50 border-2 border-blue-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-blue-900">Get Smart Route Recommendation</p>
+                    <p className="font-semibold text-blue-900">Predict Journey Duration & Weather Risk</p>
                     <p className="text-sm text-blue-700 mt-1">
-                      Let our ML model analyze the best route based on current conditions
+                      Get AI-powered journey time prediction with weather-risk analysis
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={handleGetRouteRecommendation}
+                    onClick={handleGetDeliveryPrediction}
                     disabled={isLoadingRoute}
                     className="btn-secondary whitespace-nowrap ml-4 flex items-center gap-2"
                   >
                     {isLoadingRoute ? (
                       <>
                         <FaSpinner className="animate-spin" />
-                        Analyzing...
+                        Predicting...
                       </>
                     ) : (
-                      '🚂 Get Recommendation'
+                      '🚂 Get Prediction'
                     )}
                   </button>
                 </div>
@@ -511,10 +509,10 @@ export default function BookTicketPage() {
         </div>
       </div>
 
-      {/* Route Recommendation Modal */}
+      {/* Delivery Prediction Modal */}
       <RouteRecommendationModal
         isOpen={showRouteModal}
-        recommendation={routeRecommendation}
+        prediction={deliveryPrediction}
         onClose={() => setShowRouteModal(false)}
       />
     </div>

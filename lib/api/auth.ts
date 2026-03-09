@@ -14,9 +14,11 @@ export const authApi = {
         // Store auth data in localStorage
         const authData = response.data.data;
         if (typeof window !== 'undefined') {
+          // Normalize role: strip "ROLE_" prefix if present (backend may return "ROLE_ADMIN" or "ADMIN")
+          const normalizedRole = (authData.role as string)?.replace(/^ROLE_/, '') ?? authData.role;
           localStorage.setItem('authToken', authData.token);
           localStorage.setItem('refreshToken', authData.refreshToken);
-          localStorage.setItem('userRole', authData.role);
+          localStorage.setItem('userRole', normalizedRole as string);
           localStorage.setItem('userName', authData.userName);
           localStorage.setItem('userStation', authData.station);
           localStorage.setItem('userEmail', authData.email);

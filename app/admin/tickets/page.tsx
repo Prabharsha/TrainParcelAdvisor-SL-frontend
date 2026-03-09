@@ -1,27 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { ticketApi } from '@/lib/api/ticket';
-
-interface Ticket {
-  id: number;
-  bookingReference: string;
-  passengerName: string;
-  passengerNic: string;
-  passengerMobile: string;
-  passengerEmail: string;
-  originStation: string;
-  destinationStation: string;
-  trainNumber: string;
-  travelDate: string;
-  numberOfPassengers: number;
-  seatClass: string;
-  totalFare: number;
-  status: string;
-  bookingDate: string;
-}
+import { adminApi } from '@/lib/api/admin';
+import { useStationLookup } from '@/lib/useStationLookup';
+import type { AdminTicket, AdminTicketStats } from '@/lib/types';
 
 export default function AdminTicketsPage() {
   return (
@@ -33,107 +17,107 @@ export default function AdminTicketsPage() {
 
 function AdminTicketsContent() {
   const router = useRouter();
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [filteredTickets, setFilteredTickets] = useState<Ticket[]>([]);
+  const { getStationName } = useStationLookup();
+  const [tickets, setTickets] = useState<AdminTicket[]>([]);
+  const [stats, setStats] = useState<AdminTicketStats>({ totalTickets: 0, activeBookings: 0, completed: 0, totalRevenue: 0 });
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
-  const [classFilter, setClassFilter] = useState('ALL');
+  const [classFilter, setClassFilter] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const isInitialLoad = useRef(true);
 
-  // Set mounted flag after first render to prevent hydration mismatch
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (mounted) {
-      fetchTickets();
-    }
-  }, [mounted]);
-
-  useEffect(() => {
-    applyFilters();
-  }, [searchTerm, statusFilter, dateFilter, classFilter, tickets]);
-
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async (search?: string, status?: string, seatClass?: string, travelDate?: string) => {
     try {
       setLoading(true);
-      const data = await ticketApi.getAllTickets();
-      setTickets(data);
-      setFilteredTickets(data);
+      const data = await adminApi.getAdminTickets({
+        search: search || undefined,
+        status: status || undefined,
+        seatClass: seatClass || undefined,
+        travelDate: travelDate || undefined,
+      });
+      setStats(data.stats);
+      setTickets(data.tickets);
+      setTotalCount(data.totalCount);
     } catch (error) {
       console.error('Error fetching tickets:', error);
       alert('Failed to load tickets');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const applyFilters = () => {
-    let filtered = [...tickets];
+  // Fetch with debounce for search, immediate for other filters
+  useEffect(() => {
+    if (!mounted) return;
 
-    // Search filter
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (t) =>
-          t.bookingReference.toLowerCase().includes(search) ||
-          t.passengerName.toLowerCase().includes(search) ||
-          t.passengerNic.toLowerCase().includes(search) ||
-          t.trainNumber.toLowerCase().includes(search) ||
-          t.originStation.toLowerCase().includes(search) ||
-          t.destinationStation.toLowerCase().includes(search)
-      );
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      fetchTickets();
+      return;
     }
 
-    // Status filter
-    if (statusFilter !== 'ALL') {
-      filtered = filtered.filter((t) => t.status === statusFilter);
-    }
+    const timer = setTimeout(() => {
+      fetchTickets(searchTerm, statusFilter, classFilter, dateFilter);
+    }, 300);
 
-    // Class filter
-    if (classFilter !== 'ALL') {
-      filtered = filtered.filter((t) => t.seatClass === classFilter);
-    }
+    return () => clearTimeout(timer);
+  }, [searchTerm, statusFilter, classFilter, dateFilter, mounted, fetchTickets]);
 
-    // Date filter
-    if (dateFilter) {
-      filtered = filtered.filter((t) => t.travelDate === dateFilter);
+  const handleUpdateStatus = async (bookingReference: string, newStatus: string) => {
+    try {
+      setUpdatingStatus(bookingReference);
+      const userEmail = typeof window !== 'undefined' ? localStorage.getItem('userEmail') || '' : '';
+      await adminApi.updateAdminTicketStatus(bookingReference, {
+        status: newStatus,
+        updatedBy: userEmail,
+      });
+      alert('Ticket status updated successfully');
+      fetchTickets(searchTerm, statusFilter, classFilter, dateFilter);
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('Failed to update ticket status');
+    } finally {
+      setUpdatingStatus(null);
     }
-
-    setFilteredTickets(filtered);
   };
 
   const getStatusBadge = (status: string) => {
-    const styles = {
-      BOOKED: 'bg-blue-100 text-blue-800',
-      CONFIRMED: 'bg-green-100 text-green-800',
-      TRAVELLED: 'bg-gray-100 text-gray-800',
+    const styles: Record<string, string> = {
+      PENDING: 'bg-yellow-100 text-yellow-800',
+      CONFIRMED: 'bg-blue-100 text-blue-800',
+      COMPLETED: 'bg-green-100 text-green-800',
       CANCELLED: 'bg-red-100 text-red-800',
-      COMPLETED: 'bg-purple-100 text-purple-800',
+      NO_SHOW: 'bg-orange-100 text-orange-800',
     };
-    return styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-800';
+    return styles[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      PENDING: 'Pending',
+      CONFIRMED: 'Confirmed',
+      COMPLETED: 'Completed',
+      CANCELLED: 'Cancelled',
+      NO_SHOW: 'No Show',
+    };
+    return labels[status] || status;
   };
 
   const getClassBadge = (seatClass: string) => {
-    const styles = {
+    const styles: Record<string, string> = {
       FIRST: 'bg-yellow-100 text-yellow-800',
       SECOND: 'bg-blue-100 text-blue-800',
       THIRD: 'bg-green-100 text-green-800',
     };
-    return styles[seatClass as keyof typeof styles] || 'bg-gray-100 text-gray-800';
-  };
-
-  const stats = {
-    total: tickets.length,
-    booked: tickets.filter((t) => t.status === 'BOOKED' || t.status === 'CONFIRMED').length,
-    travelled: tickets.filter((t) => t.status === 'TRAVELLED' || t.status === 'COMPLETED').length,
-    cancelled: tickets.filter((t) => t.status === 'CANCELLED').length,
-    totalRevenue: tickets
-      .filter((t) => t.status !== 'CANCELLED')
-      .reduce((sum, t) => sum + t.totalFare, 0),
+    return styles[seatClass] || 'bg-gray-100 text-gray-800';
   };
 
   const formatCurrency = (amount: number) => {
@@ -143,8 +127,12 @@ function AdminTicketsContent() {
     }).format(amount);
   };
 
+  const isTerminalStatus = (status: string) => {
+    return ['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(status);
+  };
+
   // Don't render loading state on initial server render
-  if (!mounted || loading) {
+  if (!mounted) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-railway-blue-50 to-railway-gold-50 flex items-center justify-center">
         <div className="text-center">
@@ -175,15 +163,15 @@ function AdminTicketsContent() {
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="text-3xl font-bold text-railway-blue-700">{stats.total}</div>
+            <div className="text-3xl font-bold text-railway-blue-700">{stats.totalTickets}</div>
             <div className="text-gray-600 mt-1">Total Tickets</div>
           </div>
           <div className="bg-blue-50 rounded-lg shadow-md p-6">
-            <div className="text-3xl font-bold text-blue-700">{stats.booked}</div>
+            <div className="text-3xl font-bold text-blue-700">{stats.activeBookings}</div>
             <div className="text-gray-600 mt-1">Active Bookings</div>
           </div>
           <div className="bg-green-50 rounded-lg shadow-md p-6">
-            <div className="text-3xl font-bold text-green-700">{stats.travelled}</div>
+            <div className="text-3xl font-bold text-green-700">{stats.completed}</div>
             <div className="text-gray-600 mt-1">Completed</div>
           </div>
           <div className="bg-railway-gold-50 rounded-lg shadow-md p-6">
@@ -214,12 +202,12 @@ function AdminTicketsContent() {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="input"
               >
-                <option value="ALL">All Statuses</option>
-                <option value="BOOKED">Booked</option>
+                <option value="">All Statuses</option>
+                <option value="PENDING">Pending</option>
                 <option value="CONFIRMED">Confirmed</option>
-                <option value="TRAVELLED">Travelled</option>
                 <option value="COMPLETED">Completed</option>
                 <option value="CANCELLED">Cancelled</option>
+                <option value="NO_SHOW">No Show</option>
               </select>
             </div>
             <div>
@@ -229,7 +217,7 @@ function AdminTicketsContent() {
                 onChange={(e) => setClassFilter(e.target.value)}
                 className="input"
               >
-                <option value="ALL">All Classes</option>
+                <option value="">All Classes</option>
                 <option value="FIRST">First Class</option>
                 <option value="SECOND">Second Class</option>
                 <option value="THIRD">Third Class</option>
@@ -249,6 +237,11 @@ function AdminTicketsContent() {
 
         {/* Tickets Table */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          {loading && (
+            <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-railway-red-600"></div>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-railway-blue-700 text-white">
@@ -262,17 +255,18 @@ function AdminTicketsContent() {
                   <th className="py-3 px-4 text-left">Passengers</th>
                   <th className="py-3 px-4 text-left">Fare</th>
                   <th className="py-3 px-4 text-left">Status</th>
+                  <th className="py-3 px-4 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredTickets.length === 0 ? (
+                {tickets.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-gray-500">
-                      No tickets found
+                    <td colSpan={10} className="py-8 text-center text-gray-500">
+                      {loading ? 'Loading tickets...' : 'No tickets found'}
                     </td>
                   </tr>
                 ) : (
-                  filteredTickets.map((ticket) => (
+                  tickets.map((ticket) => (
                     <tr key={ticket.id} className="hover:bg-gray-50">
                       <td className="py-3 px-4">
                         <span className="font-mono text-sm font-semibold text-railway-blue-700">
@@ -288,8 +282,8 @@ function AdminTicketsContent() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="text-sm">
-                          <div>{ticket.originStation} →</div>
-                          <div>{ticket.destinationStation}</div>
+                          <div>{getStationName(ticket.originStation)} →</div>
+                          <div>{getStationName(ticket.destinationStation)}</div>
                         </div>
                       </td>
                       <td className="py-3 px-4">
@@ -317,8 +311,22 @@ function AdminTicketsContent() {
                             ticket.status
                           )}`}
                         >
-                          {ticket.status}
+                          {getStatusLabel(ticket.status)}
                         </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <select
+                          value={ticket.status}
+                          onChange={(e) => handleUpdateStatus(ticket.bookingReference, e.target.value)}
+                          className="text-sm border border-gray-300 rounded px-2 py-1"
+                          disabled={isTerminalStatus(ticket.status) || updatingStatus === ticket.bookingReference}
+                        >
+                          <option value="PENDING">Pending</option>
+                          <option value="CONFIRMED">Confirmed</option>
+                          <option value="COMPLETED">Completed</option>
+                          <option value="CANCELLED">Cancelled</option>
+                          <option value="NO_SHOW">No Show</option>
+                        </select>
                       </td>
                     </tr>
                   ))
@@ -330,7 +338,7 @@ function AdminTicketsContent() {
 
         {/* Results Summary */}
         <div className="mt-4 text-center text-gray-600">
-          Showing {filteredTickets.length} of {tickets.length} tickets
+          Showing {totalCount} of {stats.totalTickets} tickets
         </div>
       </div>
     </div>

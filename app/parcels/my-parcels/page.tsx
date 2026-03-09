@@ -7,11 +7,13 @@ import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { parcelApi, authApi } from '@/lib/api';
+import { useStationLookup } from '@/lib/useStationLookup';
 import { formatCurrency, formatDateTime, getStatusColor } from '@/lib/utils';
 import type { Parcel } from '@/lib/types';
 
 function MyParcelsContent() {
   const router = useRouter();
+  const { getStationName } = useStationLookup();
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -174,11 +176,11 @@ function MyParcelsContent() {
                 <div className="space-y-3 mb-4">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">From:</span>
-                    <span className="font-medium">{parcel.startingDestination}</span>
+                    <span className="font-medium">{getStationName(parcel.startingDestination)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">To:</span>
-                    <span className="font-medium">{parcel.destination}</span>
+                    <span className="font-medium">{getStationName(parcel.destination)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Train:</span>

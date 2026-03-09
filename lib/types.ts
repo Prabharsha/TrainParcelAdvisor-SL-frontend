@@ -11,8 +11,8 @@ export interface ApiResponse<T> {
 
 export type UserRole = 'ADMIN' | 'STATION_MASTER' | 'CUSTOMER';
 export type UserStatus = 'ACTIVE' | 'PENDING' | 'DISABLED';
-export type ParcelStatus = 'PENDING' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED';
-export type BookingStatus = 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'BOOKED' | 'TRAVELLED';
+export type ParcelStatus = 'PENDING' | 'ACCEPTED' | 'IN_TRANSIT' | 'ARRIVED' | 'READY_FOR_PICKUP' | 'DELIVERED' | 'CANCELLED' | 'REJECTED';
+export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW' | 'BOOKED' | 'TRAVELLED';
 export type SeatClass = 'FIRST' | 'SECOND' | 'THIRD';
 
 // ========================
@@ -284,9 +284,193 @@ export interface UpdateParcelStatusRequest {
 }
 
 // ========================
+// Admin Management Types
+// ========================
+
+export interface AdminParcelStats {
+  totalParcels: number;
+  pending: number;
+  inTransit: number;
+  delivered: number;
+}
+
+export interface AdminParcel {
+  id: number;
+  trackingNumber: string;
+  senderName: string;
+  senderNic: string;
+  senderMobile: string;
+  receiverName: string;
+  startingDestination: string;
+  destination: string;
+  weightInKg: number;
+  deliveryDate: string;
+  totalCharge: number;
+  trainNumber: string;
+  numberOfParcels: number;
+  parcelType: string;
+  status: string;
+  statusUpdatedAt: string | null;
+  statusUpdatedBy: string | null;
+  remarks: string | null;
+  createdDateTime: string;
+}
+
+export interface AdminParcelsResponse {
+  stats: AdminParcelStats;
+  parcels: AdminParcel[];
+  totalCount: number;
+}
+
+export interface AdminParcelFilters {
+  search?: string;
+  status?: string;
+  deliveryDate?: string;
+}
+
+export interface AdminTicketStats {
+  totalTickets: number;
+  activeBookings: number;
+  completed: number;
+  totalRevenue: number;
+}
+
+export interface AdminTicket {
+  id: number;
+  bookingReference: string;
+  passengerName: string;
+  passengerNic: string;
+  passengerMobile: string;
+  passengerEmail: string;
+  originStation: string;
+  destinationStation: string;
+  trainNumber: string;
+  travelDate: string;
+  numberOfPassengers: number;
+  totalFare: number;
+  seatClass: string;
+  status: string;
+  statusUpdatedAt: string | null;
+  remarks: string | null;
+  createdDateTime: string;
+}
+
+export interface AdminTicketsResponse {
+  stats: AdminTicketStats;
+  tickets: AdminTicket[];
+  totalCount: number;
+}
+
+export interface AdminTicketFilters {
+  search?: string;
+  status?: string;
+  seatClass?: string;
+  travelDate?: string;
+}
+
+export interface AdminUpdateStatusRequest {
+  status: string;
+  updatedBy?: string;
+  remarks?: string;
+}
+
+// ========================
 // Form Validation Schemas
 // ========================
 
 export interface FormErrors {
   [key: string]: string;
+}
+
+// ========================
+// QR Scan & Tracking Event Types
+// ========================
+
+export interface ParcelTrackingEvent {
+  id: number;
+  trackingNumber: string;
+  previousStatus: ParcelStatus | null;
+  newStatus: ParcelStatus;
+  stationCode: string;
+  stationName: string;
+  updatedBy: string;
+  remarks: string | null;
+  eventTimestamp: string;
+  scanMethod: 'QR_SCAN' | 'MANUAL';
+}
+
+export interface QrScanUpdateRequest {
+  status: ParcelStatus;
+  remarks?: string;
+  stationCode: string;
+  updatedBy: string;
+  scanMethod: 'QR_SCAN' | 'MANUAL';
+}
+
+// Station Parcel (returned by station-master endpoints)
+export interface StationParcel {
+  trackingNumber: string;
+  senderName: string;
+  senderMobile: string;
+  senderEmail: string;
+  startingDestination: string;
+  destination: string;
+  receiverName: string;
+  receiverEmail: string;
+  parcelType: string;
+  numberOfParcels: number;
+  deliveryDate: string;
+  weightInKg: number;
+  trainNumber: string;
+  totalCharge: number;
+  status: ParcelStatus;
+  statusUpdatedAt: string | null;
+  statusUpdatedBy: string | null;
+  remarks: string | null;
+  createdDateTime: string;
+}
+
+// ========================
+// Analytics & Report Types
+// ========================
+
+export interface AnalyticsSummary {
+  totalParcels: number;
+  totalRevenue: number;
+  deliveredCount: number;
+  pendingCount: number;
+  inTransitCount: number;
+  avgWeight: number;
+}
+
+export interface DailyAnalytics {
+  date: string;
+  parcelCount: number;
+  revenue: number;
+}
+
+export interface StatusDistribution {
+  status: string;
+  count: number;
+}
+
+export interface StationAnalytics {
+  stationCode: string;
+  stationName: string;
+  parcelCount: number;
+  totalRevenue: number;
+}
+
+export interface AnalyticsResponse {
+  summary?: AnalyticsSummary;
+  dailyTrends?: DailyAnalytics[];
+  statusDistribution?: StatusDistribution[];
+  topStations?: StationAnalytics[];
+}
+
+export interface ReportFilters {
+  startDate?: string;
+  endDate?: string;
+  status?: string;
+  stationCode?: string;
 }
